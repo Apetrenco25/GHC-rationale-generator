@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Palo Alto Networks - AI Feedback Summarizer</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React Libraries -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel to transpile JSX in the browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // --- React Component Code Starts Here ---
+
+        // --- SVG Icons ---
+        const UserIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-gray-400"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+        );
+        const FileTextIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-gray-400"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><line x1="10" y1="9" x2="8" y2="9" /></svg>
+        );
+        const StarIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-gray-400"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
+        );
+        const MessageSquareIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-gray-400"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+        );
+        const AlertTriangleIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-yellow-500 mr-2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        );
+        const ClipboardIcon = ({ copied }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                {copied ? <polyline points="20 6 9 17 4 12"></polyline> : <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>}
+                {!copied && <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>}
+            </svg>
+        );
+
+        // --- Main App Component ---
+        const App = () => {
+            // Input state
+            const [candidateName, setCandidateName] = React.useState('');
+            const [jobSpecLink, setJobSpecLink] = React.useState('');
+            const [executiveSummary, setExecutiveSummary] = React.useState('');
+            const [top3Characteristics, setTop3Characteristics] = React.useState('');
+            const [interviewFeedback, setInterviewFeedback] = React.useState('');
+
+            // Output state
+            const [summary, setSummary] = React.useState('');
+            const [criticalFeedback, setCriticalFeedback] = React.useState([]);
+            const [isLoading, setIsLoading] = React.useState(false);
+            const [error, setError] = React.useState(null);
+            
+            // UI State
+            const [copiedSummary, setCopiedSummary] = React.useState(false);
+            const [copiedFeedback, setCopiedFeedback] = React.useState(false);
+
+            const handleGenerate = async () => {
+                setIsLoading(true);
+                setError(null);
+                setSummary('');
+                setCriticalFeedback([]);
+
+                const systemPrompt = `You are an expert HR analyst and recruitment assistant for Palo Alto Networks. Your task is to synthesize raw interview feedback into a concise, actionable summary for a hiring committee and to flag any potential concerns. Analyze the provided information and generate a response in a clean JSON format.`;
+                
+                const userQuery = `
+                    Here is the information for a candidate:
+                    - Candidate Name: "${candidateName}"
+                    - Job Spec Hyperlink: "${jobSpecLink}"
+                    - Executive Summary of the Role: "${executiveSummary}"
+                    - Top 3 Characteristics for the Role: "${top3Characteristics}"
+                    - Raw Interview Feedback from multiple interviewers: "${interviewFeedback}"
+
+                    Based on all this information, provide the following in a JSON object with two keys: "summary" and "criticalFeedback":
+                    1.  "summary": A detailed analysis of the candidate's performance against the key requirements. Structure this as a single string. Start with a brief introductory sentence. Then, create a bullet point for each of the "Top 3 Characteristics", analyzing the interview feedback specifically related to that characteristic. Use markdown for bullet points (e.g., "- Characteristic: [Analysis of feedback]").
+                    2.  "criticalFeedback": An array of strings. Each string should be a direct quote or a succinct summary of a piece of critical, negative, or developmental feedback mentioned in the interviews. If there is no such feedback, return an empty array.
+                `;
+
+                try {
+                    const apiKey = ""; // This will be handled by the environment
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                    const payload = {
+                        contents: [{ parts: [{ text: userQuery }] }],
+                        systemInstruction: { parts: [{ text: systemPrompt }] },
+                    };
+
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`API call failed with status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                    if (!text) {
+                        throw new Error("No content received from the API.");
+                    }
+                    
+                    // FIX: Corrected regex to remove backticks (```) instead of single quotes (''').
+                    const cleanedText = text.replace(/```json|```/g, '').trim();
+                    const parsedData = JSON.parse(cleanedText);
+
+                    setSummary(parsedData.summary || 'No summary was generated.');
+                    setCriticalFeedback(parsedData.criticalFeedback || []);
+
+                } catch (e) {
+                    console.error(e);
+                    setError('Failed to generate summary. The AI response may be malformed. Please try again.');
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            
+            const copyToClipboard = (text, type) => {
+                const tempTextArea = document.createElement('textarea');
+                tempTextArea.value = text;
+                document.body.appendChild(tempTextArea);
+                tempTextArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempTextArea);
+                
+                if (type === 'summary') {
+                    setCopiedSummary(true);
+                    setTimeout(() => setCopiedSummary(false), 2000);
+                } else {
+                    setCopiedFeedback(true);
+                    setTimeout(() => setCopiedFeedback(false), 2000);
+                }
+            };
+
+            return (
+                <div className="bg-gray-50 min-h-screen font-sans text-gray-900 p-4 sm:p-6 lg:p-8">
+                    <div className="max-w-4xl mx-auto">
+                        <header className="mb-8 text-center">
+                            <img src="[https://www.paloaltonetworks.com/content/dam/pan/en_US/images/logos/brand/primary-company-logo/PANW_Parent_Brand_Primary_Logo_RGB.svg](https://www.paloaltonetworks.com/content/dam/pan/en_US/images/logos/brand/primary-company-logo/PANW_Parent_Brand_Primary_Logo_RGB.svg)" alt="Palo Alto Networks Logo" className="h-10 mx-auto"/>
+                            <h1 className="text-3xl font-bold text-gray-900 mt-4">AI Interview Feedback Summarizer</h1>
+                            <p className="text-gray-600">Enter interview details to generate a concise summary for the hiring committee.</p>
+                        </header>
+
+                        <div className="bg-white p-8 rounded-2xl shadow-lg">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                                {/* Column 1 */}
+                                <div className="space-y-6">
+                                   <Input label="Candidate Name" value={candidateName} onChange={(e) => setCandidateName(e.target.value)} placeholder="e.g., Jane Doe" icon={<UserIcon />} />
+                                   <Input label="Job Spec Hyperlink" value={jobSpecLink} onChange={(e) => setJobSpecLink(e.target.value)} placeholder="[https://jobs.paloaltonetworks.com/](https://jobs.paloaltonetworks.com/)..." icon={<FileTextIcon />} />
+                                   <TextArea label="Executive Summary of Role" value={executiveSummary} onChange={(e) => setExecutiveSummary(e.target.value)} placeholder="Describe the role's purpose, key responsibilities, and team impact..." rows={5} />
+                                </div>
+                                {/* Column 2 */}
+                                 <div className="space-y-6">
+                                     <TextArea label="Top 3 Characteristics" value={top3Characteristics} onChange={(e) => setTop3Characteristics(e.target.value)} placeholder="e.g., 1. Strong Go-to-Market experience...&#10;2. Collaborative mindset...&#10;3. Data-driven decision maker..." rows={5} />
+                                     <TextArea label="Combined Interview Feedback" value={interviewFeedback} onChange={(e) => setInterviewFeedback(e.target.value)} placeholder="Paste all raw interview feedback from every interviewer here..." rows={10} />
+                                </div>
+                            </div>
+                            
+                            <div className="mt-8 pt-6 border-t border-gray-200">
+                                <button 
+                                    onClick={handleGenerate} 
+                                    disabled={isLoading}
+                                    className="w-full bg-[#FF6B0D] text-white font-semibold py-3 px-6 rounded-lg hover:bg-[#E6600C] transition-all duration-300 disabled:bg-[#FFAF80] disabled:cursor-not-allowed flex items-center justify-center"
+                                >
+                                    {isLoading ? (
+                                        <>
+                                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Analyzing Feedback...
+                                        </>
+                                    ) : "Generate Analysis"}
+                                </button>
+                            </div>
+                        </div>
+
+                        {error && (
+                             <div className="mt-8 bg-red-50 border border-red-200 text-red-800 p-4 rounded-lg">
+                                <p className="font-semibold">An Error Occurred</p>
+                                <p>{error}</p>
+                            </div>
+                        )}
+
+                        {(summary || criticalFeedback.length > 0) && !isLoading && (
+                            <div className="mt-8 bg-white p-8 rounded-2xl shadow-lg animate-fade-in">
+                                <h2 className="text-2xl font-bold text-gray-900 mb-6">Generated Analysis</h2>
+                                <div className="space-y-6">
+                                    <div>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <h3 className="text-lg font-semibold text-gray-900">Feedback Summary</h3>
+                                             <button onClick={() => copyToClipboard(summary, 'summary')} className={`text-gray-500 hover:text-[#FF6B0D] transition-colors ${copiedSummary ? 'text-green-600' : ''}`}>
+                                                <ClipboardIcon copied={copiedSummary} />
+                                            </button>
+                                        </div>
+                                        <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{summary}</p>
+                                    </div>
+                                    
+                                    {criticalFeedback.length > 0 && (
+                                        <div className="pt-6 border-t border-gray-200">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <h3 className="text-lg font-semibold text-yellow-700 flex items-center"><AlertTriangleIcon /> Developmental Feedback Flags</h3>
+                                                 <button onClick={() => copyToClipboard(criticalFeedback.join('\n'), 'feedback')} className={`text-gray-500 hover:text-yellow-600 transition-colors ${copiedFeedback ? 'text-green-600' : ''}`}>
+                                                    <ClipboardIcon copied={copiedFeedback} />
+                                                </button>
+                                            </div>
+                                            <ul className="list-disc list-inside space-y-2 text-gray-700">
+                                                {criticalFeedback.map((item, index) => (
+                                                    <li key={index}>{item}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                         <footer className="text-center mt-8 text-sm text-gray-500">
+                            <p>&copy; {new Date().getFullYear()} Palo Alto Networks. All rights reserved. Confidential & Proprietary.</p>
+                        </footer>
+                    </div>
+                    <style>{`
+                        .animate-fade-in {
+                            animation: fadeIn 0.5s ease-in-out;
+                        }
+                        @keyframes fadeIn {
+                            from { opacity: 0; transform: translateY(10px); }
+                            to { opacity: 1; transform: translateY(0); }
+                        }
+                    `}</style>
+                </div>
+            );
+        };
+
+        // --- Helper Components ---
+        const Input = ({ label, value, onChange, placeholder, icon }) => (
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        {icon}
+                    </div>
+                    <input 
+                        type="text" 
+                        value={value} 
+                        onChange={onChange} 
+                        placeholder={placeholder}
+                        className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B0D] focus:border-[#FF6B0D] outline-none transition-all"
+                    />
+                </div>
+            </div>
+        );
+
+        const TextArea = ({ label, value, onChange, placeholder, rows }) => (
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+                <textarea
+                    value={value}
+                    onChange={onChange}
+                    placeholder={placeholder}
+                    rows={rows}
+                    className="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B0D] focus:border-[#FF6B0D] outline-none transition-all resize-vertical"
+                ></textarea>
+            </div>
+        );
+        
+        // --- Render the App to the DOM ---
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+
+    </script>
+</body>
+</html>
+
